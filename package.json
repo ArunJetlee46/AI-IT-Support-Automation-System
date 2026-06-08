@@ -1,0 +1,39 @@
+{
+  "name": "ai-it-support-automation-system",
+  "version": "1.0.0",
+  "description": "AI-Powered IT Help Desk Ticket Management System",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "dev": "npm --prefix backend run dev & npm --prefix frontend run dev",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "backend:build": "npm --prefix backend run build",
+    "backend:dev": "npm --prefix backend run dev",
+    "backend:start": "npm --prefix backend start",
+    "frontend:dev": "npm --prefix frontend run dev",
+    "frontend:build": "npm --prefix frontend run build",
+    "frontend:preview": "npm --prefix frontend run preview",
+    "test": "echo \"Testing not yet implemented\" && exit 0"
+  },
+  "keywords": [
+    "IT Support",
+    "Ticket Management",
+    "AI",
+    "OpenAI",
+    "React",
+    "Node.js",
+    "Express",
+    "PostgreSQL"
+  ],
+  "author": "Arun Jetlee",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArunJetlee46/AI-IT-Support-Automation-System.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ArunJetlee46/AI-IT-Support-Automation-System/issues"
+  },
+  "homepage": "https://github.com/ArunJetlee46/AI-IT-Support-Automation-System#readme"
+}
