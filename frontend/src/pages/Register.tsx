@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
+import { Mail, Lock, User, AlertCircle } from 'lucide-react';
 
 const Register: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -37,7 +37,7 @@ const Register: React.FC = () => {
 
     try {
       await register(formData.email, formData.password, formData.name, formData.user_type);
-      navigate('/dashboard');
+      navigate(formData.user_type === 'internal' ? '/admin/dashboard' : '/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Registration failed');
     } finally {
