@@ -2,25 +2,23 @@ import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database';
 
 export const generateTicketId = async (): Promise<string> => {
-  let ticketId: string;
-  let isUnique = false;
+  const result = await pool.query(
+    `SELECT id FROM tickets
+     WHERE id ~ '^TKT-[0-9]+$'
+     ORDER BY CAST(SUBSTRING(id FROM 5) AS INTEGER) DESC
+     LIMIT 1`
+  );
 
-  while (!isUnique) {
-    const randomNum = Math.floor(Math.random() * 9000) + 1000;
-    ticketId = `TKT-${randomNum}`;
-
-    const result = await pool.query('SELECT id FROM tickets WHERE id = $1', [ticketId]);
-    if (result.rows.length === 0) {
-      isUnique = true;
-    }
+  if (result.rows.length === 0) {
+    return 'TKT-1001';
   }
 
-  return ticketId!;
+  const latestId = result.rows[0].id as string;
+  const nextNumber = Number(latestId.replace('TKT-', '')) + 1;
+  return `TKT-${nextNumber}`;
 };
 
-export const generateUUID = (): string => {
-  return uuidv4();
-};
+export const generateUUID = (): string => uuidv4();
 
 export const getTimeElapsed = (createdAt: Date): string => {
   const now = new Date();

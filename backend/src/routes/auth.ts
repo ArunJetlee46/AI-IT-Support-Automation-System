@@ -3,20 +3,32 @@ import bcryptjs from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import pool from '../config/database';
-import { AuthRequest, authMiddleware } from '../middleware/auth';
-import { validateEmail, validatePassword, AppError } from '../utils/errors';
+import { AuthRequest, authMiddleware, internalUserMiddleware } from '../middleware/auth';
+import { validateEmail, validatePassword, sanitizeInput } from '../utils/errors';
 import { generateUUID } from '../utils/constants';
 
 dotenv.config();
 
 const router = Router();
+const jwtSecret = process.env.JWT_SECRET;
+const jwtExpiration = process.env.JWT_EXPIRATION || '24h';
+
+const signToken = (user: { id: string; email: string; role: string; user_type: 'internal' | 'external' }) => {
+  if (!jwtSecret) {
+    throw new Error('JWT_SECRET not configured');
+  }
+
+  return jwt.sign(user, jwtSecret, { expiresIn: jwtExpiration });
+};
 
 // POST /api/auth/register
 router.post('/register', async (req: AuthRequest, res: Response) => {
   try {
-    const { email, password, name, user_type } = req.body;
+    const email = sanitizeInput(String(req.body.email || '')).toLowerCase();
+    const password = String(req.body.password || '');
+    const name = sanitizeInput(String(req.body.name || ''));
+    const user_type = req.body.user_type as 'internal' | 'external';
 
-    // Validation
     if (!email || !password || !name || !user_type) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -33,17 +45,14 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Invalid user_type' });
     }
 
-    // Check if user exists
     const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
       return res.status(400).json({ error: 'Email already registered' });
     }
 
-    // Hash password
     const hashedPassword = await bcryptjs.hash(password, 10);
     const userId = generateUUID();
 
-    // Insert user
     const result = await pool.query(
       `INSERT INTO users (id, email, password, name, user_type, role, is_active)
        VALUES ($1, $2, $3, $4, $5, $6, true)
@@ -52,17 +61,10 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
     );
 
     const user = result.rows[0];
-
-    // Generate JWT
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, user_type: user.user_type },
-      process.env.JWT_SECRET || 'secret',
-      { expiresIn: process.env.JWT_EXPIRATION || '24h' }
-    );
+    const token = signToken(user);
 
     res.status(201).json({ user_id: user.id, token, user });
-  } catch (error) {
-    console.error('Register error:', error);
+  } catch {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -70,13 +72,13 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
 // POST /api/auth/login
 router.post('/login', async (req: AuthRequest, res: Response) => {
   try {
-    const { email, password } = req.body;
+    const email = sanitizeInput(String(req.body.email || '')).toLowerCase();
+    const password = String(req.body.password || '');
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
-    // Find user
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid email or password' });
@@ -84,7 +86,6 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
 
     const user = result.rows[0];
 
-    // Verify password
     const isPasswordValid = await bcryptjs.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid email or password' });
@@ -94,12 +95,12 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ error: 'Account is inactive' });
     }
 
-    // Generate JWT
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, user_type: user.user_type },
-      process.env.JWT_SECRET || 'secret',
-      { expiresIn: process.env.JWT_EXPIRATION || '24h' }
-    );
+    const token = signToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      user_type: user.user_type,
+    });
 
     res.json({
       user_id: user.id,
@@ -109,8 +110,7 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
       name: user.name,
       email: user.email,
     });
-  } catch (error) {
-    console.error('Login error:', error);
+  } catch {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -119,7 +119,7 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
 router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query(
-      'SELECT id, email, name, role, user_type, phone, department, created_at FROM users WHERE id = $1',
+      'SELECT id, email, name, role, user_type, phone, department, created_at, updated_at FROM users WHERE id = $1',
       [req.user?.id]
     );
 
@@ -128,16 +128,30 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
     }
 
     res.json(result.rows[0]);
-  } catch (error) {
-    console.error('Get user error:', error);
+  } catch {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // POST /api/auth/logout
-router.post('/logout', authMiddleware, (req: AuthRequest, res: Response) => {
-  // JWT logout is handled on the client side by removing the token
+router.post('/logout', authMiddleware, (_req: AuthRequest, res: Response) => {
   res.json({ message: 'Logged out successfully' });
+});
+
+// GET /api/auth/internal-users
+router.get('/internal-users', authMiddleware, internalUserMiddleware, async (_req: AuthRequest, res: Response) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, email, role
+       FROM users
+       WHERE user_type = 'internal' AND is_active = true
+       ORDER BY name ASC`
+    );
+
+    res.json({ users: result.rows });
+  } catch {
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 export default router;

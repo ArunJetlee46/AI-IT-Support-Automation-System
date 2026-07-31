@@ -4,28 +4,43 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const jwtSecret = process.env.JWT_SECRET;
+
 export interface AuthRequest extends Request {
   user?: {
     id: string;
     email: string;
     role: string;
-    user_type: string;
+    user_type: 'internal' | 'external';
   };
 }
 
 export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
-  const token = req.headers.authorization?.split(' ')[1];
+  if (!jwtSecret) {
+    return res.status(500).json({ error: 'Authentication is not configured' });
+  }
 
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized: Missing bearer token' });
+  }
+
+  const token = authHeader.slice(7).trim();
   if (!token) {
-    return res.status(401).json({ error: 'Unauthorized: No token provided' });
+    return res.status(401).json({ error: 'Unauthorized: Missing bearer token' });
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as any;
+    const decoded = jwt.verify(token, jwtSecret) as AuthRequest['user'];
+
+    if (!decoded?.id || !decoded?.email || !decoded?.role || !decoded?.user_type) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid token payload' });
+    }
+
     req.user = decoded;
     next();
-  } catch (error) {
-    return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized: Invalid or expired token' });
   }
 };
 
@@ -34,6 +49,7 @@ export const roleMiddleware = (allowedRoles: string[]) => {
     if (!req.user || !allowedRoles.includes(req.user.role)) {
       return res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
     }
+
     next();
   };
 };
@@ -42,5 +58,6 @@ export const internalUserMiddleware = (req: AuthRequest, res: Response, next: Ne
   if (!req.user || req.user.user_type !== 'internal') {
     return res.status(403).json({ error: 'Forbidden: Internal users only' });
   }
+
   next();
 };

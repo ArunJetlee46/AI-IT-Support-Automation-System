@@ -1,13 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authAPI } from '../api/client';
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-  user_type: 'internal' | 'external';
-}
+import { User } from '../types';
 
 interface AuthContextType {
   user: User | null;
@@ -27,63 +20,80 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('authToken');
-    const storedUser = localStorage.getItem('user');
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
+    const init = async () => {
+      const storedToken = localStorage.getItem('authToken');
+      const storedUser = localStorage.getItem('user');
+
+      if (storedToken && storedUser) {
+        setToken(storedToken);
+        setUser(JSON.parse(storedUser));
+
+        try {
+          const { data } = await authAPI.getProfile();
+          const updatedUser: User = {
+            id: data.id,
+            email: data.email,
+            name: data.name,
+            role: data.role,
+            user_type: data.user_type,
+          };
+          setUser(updatedUser);
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+        } catch {
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          setToken(null);
+          setUser(null);
+        }
+      }
+
+      setLoading(false);
+    };
+
+    init();
   }, []);
 
   const login = async (email: string, password: string) => {
-    try {
-      const { data } = await authAPI.login({ email, password });
-      setToken(data.token);
-      const userData: User = {
-        id: data.user_id,
-        email: data.email,
-        name: data.name,
-        role: data.role,
-        user_type: data.user_type,
-      };
-      setUser(userData);
-      localStorage.setItem('authToken', data.token);
-      localStorage.setItem('user', JSON.stringify(userData));
-    } catch (error) {
-      throw error;
-    }
+    const { data } = await authAPI.login({ email, password });
+    setToken(data.token);
+    const userData: User = {
+      id: data.user_id,
+      email: data.email,
+      name: data.name,
+      role: data.role,
+      user_type: data.user_type,
+    };
+    setUser(userData);
+    localStorage.setItem('authToken', data.token);
+    localStorage.setItem('user', JSON.stringify(userData));
   };
 
   const register = async (email: string, password: string, name: string, user_type: 'internal' | 'external') => {
-    try {
-      const { data } = await authAPI.register({ email, password, name, user_type });
-      setToken(data.token);
-      const userData: User = {
-        id: data.user_id,
-        email: data.user.email,
-        name: data.user.name,
-        role: data.user.role,
-        user_type: data.user.user_type,
-      };
-      setUser(userData);
-      localStorage.setItem('authToken', data.token);
-      localStorage.setItem('user', JSON.stringify(userData));
-    } catch (error) {
-      throw error;
-    }
+    const { data } = await authAPI.register({ email, password, name, user_type });
+    setToken(data.token);
+    const userData: User = {
+      id: data.user_id,
+      email: data.user.email,
+      name: data.user.name,
+      role: data.user.role,
+      user_type: data.user.user_type,
+    };
+    setUser(userData);
+    localStorage.setItem('authToken', data.token);
+    localStorage.setItem('user', JSON.stringify(userData));
   };
 
   const logout = async () => {
     try {
       await authAPI.logout();
-      setUser(null);
-      setToken(null);
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-    } catch (error) {
-      console.error('Logout error:', error);
+    } catch {
+      // Ignore logout API failure and clear client session anyway
     }
+
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
   };
 
   return (

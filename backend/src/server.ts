@@ -1,4 +1,4 @@
-import express, { Express, Request, Response } from 'express';
+import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { initializeDatabase } from './config/schema';
@@ -11,64 +11,80 @@ import commentRoutes from './routes/comments';
 dotenv.config();
 
 const app: Express = express();
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT || 5000);
 
-// Middleware
+const corsWhitelist = (process.env.FRONTEND_URL || 'http://localhost:3000')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean);
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || corsWhitelist.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  })
+);
 app.use(rateLimit);
 
-// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/tickets/:id/comments', commentRoutes);
 
-// Metadata endpoints
-app.get('/api/categories', (req: Request, res: Response) => {
-  res.json({ categories: Categories });
+app.get('/api/categories', (_req: Request, res: Response) => {
+  res.json(Categories);
 });
 
-app.get('/api/priorities', (req: Request, res: Response) => {
-  res.json({ priorities: Priorities });
+app.get('/api/priorities', (_req: Request, res: Response) => {
+  res.json(Priorities);
 });
 
-app.get('/api/statuses', (req: Request, res: Response) => {
-  res.json({ statuses: Statuses });
+app.get('/api/statuses', (_req: Request, res: Response) => {
+  res.json(Statuses);
 });
 
-// Health check
-app.get('/api/health', (req: Request, res: Response) => {
+app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ status: 'Server is running' });
 });
 
-// 404 handler
-app.use((req: Request, res: Response) => {
+app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: 'Endpoint not found' });
 });
 
-// Error handling middleware
-app.use((err: any, req: Request, res: Response) => {
-  console.error(err);
-  res.status(err.statusCode || 500).json({ error: err.message || 'Internal server error' });
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  if (err.message.includes('File too large')) {
+    return res.status(400).json({ error: 'Attachment exceeds maximum allowed file size' });
+  }
+
+  if (err.message.includes('File type not allowed')) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  if (err.message.includes('CORS')) {
+    return res.status(403).json({ error: 'Forbidden by CORS policy' });
+  }
+
+  return res.status(500).json({ error: 'Internal server error' });
 });
 
-// Start server
 const startServer = async () => {
   try {
-    // Initialize database
     await initializeDatabase();
 
     app.listen(PORT, () => {
       console.log(`✓ Server running on port ${PORT}`);
       console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`✓ CORS enabled for ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
     });
   } catch (error) {
-    console.error('✗ Failed to start server:', error);
+    console.error('✗ Failed to start server');
     process.exit(1);
   }
 };

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { LogOut, Plus, Tickets } from 'lucide-react';
+import { LogOut, Plus, Tickets, UserCircle2, BarChart3 } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -14,7 +14,6 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-900">IT Support System</h1>
@@ -33,13 +32,11 @@ const Dashboard: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {user?.user_type === 'external' ? (
             <>
-              {/* Customer Dashboard */}
-              <div className="card">
+              <Link to="/create-ticket" className="card hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-blue-100 rounded-lg">
                     <Plus className="w-6 h-6 text-blue-600" />
@@ -49,24 +46,35 @@ const Dashboard: React.FC = () => {
                     <p className="text-sm text-gray-600">Submit a new support request</p>
                   </div>
                 </div>
-              </div>
+              </Link>
 
-              <div className="card">
+              <Link to="/tickets" className="card hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-green-100 rounded-lg">
                     <Tickets className="w-6 h-6 text-green-600" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900">My Tickets</h3>
-                    <p className="text-sm text-gray-600">View and track your tickets</p>
+                    <p className="text-sm text-gray-600">View and track your requests</p>
                   </div>
                 </div>
-              </div>
+              </Link>
+
+              <Link to="/profile" className="card hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-indigo-100 rounded-lg">
+                    <UserCircle2 className="w-6 h-6 text-indigo-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Profile</h3>
+                    <p className="text-sm text-gray-600">View your account information</p>
+                  </div>
+                </div>
+              </Link>
             </>
           ) : (
             <>
-              {/* Staff Dashboard */}
-              <div className="card">
+              <Link to="/admin/dashboard" className="card hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-purple-100 rounded-lg">
                     <Tickets className="w-6 h-6 text-purple-600" />
@@ -76,31 +84,33 @@ const Dashboard: React.FC = () => {
                     <p className="text-sm text-gray-600">View and manage all support tickets</p>
                   </div>
                 </div>
-              </div>
+              </Link>
 
-              <div className="card">
+              <Link to="/admin/analytics" className="card hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-orange-100 rounded-lg">
-                    <Tickets className="w-6 h-6 text-orange-600" />
+                    <BarChart3 className="w-6 h-6 text-orange-600" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900">Analytics</h3>
-                    <p className="text-sm text-gray-600">View support metrics and insights</p>
+                    <p className="text-sm text-gray-600">Basic metrics (placeholder)</p>
                   </div>
                 </div>
-              </div>
+              </Link>
+
+              <Link to="/profile" className="card hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-indigo-100 rounded-lg">
+                    <UserCircle2 className="w-6 h-6 text-indigo-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Profile</h3>
+                    <p className="text-sm text-gray-600">View your account information</p>
+                  </div>
+                </div>
+              </Link>
             </>
           )}
-        </div>
-
-        <div className="mt-8 bg-white rounded-lg shadow border border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Getting Started</h2>
-          <p className="text-gray-600">
-            Welcome to the IT Support System! Select an option above to get started. 
-            {user?.user_type === 'external' 
-              ? ' Create a ticket to report an issue and track its progress.'
-              : ' Manage and resolve support tickets from users.'}
-          </p>
         </div>
       </main>
     </div>
